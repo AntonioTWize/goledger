@@ -7,7 +7,9 @@
 package main
 
 import (
+	"github.com/AntonioTWize/goledger/db"
 	"github.com/AntonioTWize/goledger/handlers"
+	"github.com/AntonioTWize/goledger/repositories"
 	"github.com/AntonioTWize/goledger/routes"
 	"github.com/labstack/echo/v4"
 )
@@ -15,7 +17,9 @@ import (
 // Injectors from wire.go:
 
 func InitializeServer() (*echo.Echo, error) {
-	chargeHandler := handlers.NewChargeHandler()
+	sqlDB := db.Connect()
+	chargeRepository := repositories.NewChargeRepository(sqlDB)
+	chargeHandler := handlers.NewChargeHandler(chargeRepository)
 	echoEcho := routes.NewRouter(chargeHandler)
 	return echoEcho, nil
 }

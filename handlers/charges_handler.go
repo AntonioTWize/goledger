@@ -2,66 +2,86 @@ package handlers
 
 import (
   "net/http"
+  "strconv"
 
+  "github.com/AntonioTWize/goledger/repositories"
   "github.com/labstack/echo/v4"
 )
 
-type Charge struct {
-  ID           string  `json:"id"`
-  Concept      string  `json:"concept"`
-  Amount       float64 `json:"amount"`
-  PaymentMethod string  `json:"payment_method"`
-  Category     string  `json:"category"`
-  Date         string  `json:"date"`
-}
-
 type ChargeHandler struct {
-  // Aquí puedes agregar dependencias como servicios o repositorios en el futuro.
+  Repository *repositories.ChargeRepository
 }
 
-func NewChargeHandler() *ChargeHandler {
-  return &ChargeHandler{}
+func NewChargeHandler(repo *repositories.ChargeRepository) *ChargeHandler {
+  return &ChargeHandler{Repository: repo}
 }
 
 func (h *ChargeHandler) CreateCharge(c echo.Context) error {
-  charge := new(Charge)
-  if err := c.Bind(charge); err != nil {
+  var charge repositories.Charge
+  if err := c.Bind(&charge); err != nil {
     return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
   }
-  charge.ID = "1" // Generar ID único en el futuro
+
+  if charge.Concept == "" || charge.Amount <= 0 || charge.PaymentMethod == "" || charge.Category == "" || charge.Date == "" {
+    return c.JSON(http.StatusBadRequest, map[string]string{"error": "All fields are required"})
+  }
+
+  if err := h.Repository.CreateCharge(&charge); err != nil {
+    return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+  }
+
   return c.JSON(http.StatusCreated, charge)
 }
 
 func (h *ChargeHandler) GetAllCharges(c echo.Context) error {
-  // Datos de ejemplo
-  charges := []Charge{
-    {ID: "1", Concept: "Compra", Amount: 100.0, PaymentMethod: "Tarjeta", Category: "Compras", Date: "2024-12-22"},
-    {ID: "2", Concept: "Transporte", Amount: 50.0, PaymentMethod: "Efectivo", Category: "Viajes", Date: "2024-12-21"},
+  charges, err := h.Repository.GetAllCharges()
+  if err != nil {
+    return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
   }
   return c.JSON(http.StatusOK, charges)
 }
 
 func (h *ChargeHandler) GetChargeByID(c echo.Context) error {
-  id := c.Param("id")
-  // Datos de ejemplo
-  if id == "1" {
-    charge := Charge{ID: "1", Concept: "Compra", Amount: 100.0, PaymentMethod: "Tarjeta", Category: "Compras", Date: "2024-12-22"}
-    return c.JSON(http.StatusOK, charge)
+  id, err := strconv.Atoi(c.Param("id"))
+  if err != nil {
+    return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid ID"})
   }
-  return c.JSON(http.StatusNotFound, map[string]string{"error": "Charge not found"})
+
+  charge, err := h.Repository.GetChargeByID(id)
+  if err != nil {
+    return c.JSON(http.StatusNotFound, map[string]string{"error": "Charge not found"})
+  }
+  return c.JSON(http.StatusOK, charge)
 }
 
 func (h *ChargeHandler) UpdateCharge(c echo.Context) error {
-  id := c.Param("id")
-  updatedCharge := new(Charge)
-  if err := c.Bind(updatedCharge); err != nil {
+  id, err := strconv.Atoi(c.Param("id"))
+  if err != nil {
+    return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid ID"})
+  }
+
+  var updatedCharge repositories.Charge
+  if err := c.Bind(&updatedCharge); err != nil {
     return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid input"})
   }
-  updatedCharge.ID = id // Mantener el mismo ID
+
+  updatedCharge.ID = id
+  if err := h.Repository.UpdateCharge(&updatedCharge); err != nil {
+    return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+  }
+
   return c.JSON(http.StatusOK, updatedCharge)
 }
 
 func (h *ChargeHandler) DeleteCharge(c echo.Context) error {
-  id := c.Param("id")
-  return c.JSON(http.StatusOK, map[string]string{"message": "Charge deleted", "id": id})
+  id, err := strconv.Atoi(c.Param("id"))
+  if err != nil {
+    return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid ID"})
+  }
+
+  if err := h.Repository.DeleteCharge(id); err != nil {
+    return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+  }
+
+  return c.JSON(http.StatusOK, map[string]string{"message": "Charge deleted"})
 }
